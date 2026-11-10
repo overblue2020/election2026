@@ -8,6 +8,10 @@
 const SPREADSHEET_ID = '1VvcyPCfXGYOOrgpLO6jR7gXryaDYoL3lkKvBbndQ4lc';
 const SHEET_NAME = '預測名單';
 const DEADLINE = new Date('2026-11-27T23:59:00+08:00');
+const INVITE_SHEET = '邀請碼';
+// 邀請碼只填在 Apps Script 裡，不要提交到 GitHub。格式：['0001', 'XXXXXXXX'], ...
+// 首次執行時會建立「邀請碼」工作表；之後新增或停用邀請碼，直接改那張工作表即可。
+const INVITE_CODES = [];
 
 const COUNTIES = [
   '基隆市', '桃園市', '新竹市', '新竹縣', '苗栗縣', '台中市', '彰化縣', '南投縣', '宜蘭縣', '花蓮縣',
@@ -17,7 +21,7 @@ const COUNTIES = [
 const HEADER = [
   '送出時間', '暱稱', '台北市', '台北票差', '新北市', '高雄市',
   ...COUNTIES,
-  '加分1 佀廣洋', '加分2 得票數', '加分3 綠營席次', '加分3 泛藍席次'
+  '加分1 佀廣洋', '加分2 得票數', '加分3 綠營席次', '加分3 泛藍席次', '邀請編號'
 ];
 
 function doPost(e) {
@@ -31,6 +35,9 @@ function doPost(e) {
     if (new Date() > DEADLINE) return reply({ ok: false, error: 'closed' });
 
     const d = JSON.parse(e.postData.contents);
+    const invite = findInvite(d.key);
+    if (!invite) return reply({ ok: false, error: 'badkey' });
+    if (invite.used) return reply({ ok: false, error: 'used' });
     const nickname = String(d.nickname || '').trim().slice(0, 20);
     const counties = d.counties || {};
     const complete =
@@ -55,8 +62,10 @@ function doPost(e) {
       d.q1 === '是' ? '當選' : '落選',
       Number(d.q2),
       Number(d.q3),
-      22 - Number(d.q3)
+      22 - Number(d.q3),
+      invite.label
     ]);
+    invite.sheet.getRange(invite.row, 3, 1, 3).setValues([['已使用', new Date(), nickname]]);
     return reply({ ok: true });
   } catch (err) {
     return reply({ ok: false, error: 'server' });
@@ -66,8 +75,49 @@ function doPost(e) {
 }
 
 function doGet(e) {
-  if (e && e.parameter && e.parameter.stats) return reply(stats());
-  return reply({ ok: true, open: new Date() <= DEADLINE });
+  const p = (e && e.parameter) || {};
+  if (p.check !== undefined) {
+    const inv = findInvite(p.check);
+    return reply({ ok: true, valid: !!inv, used: !!(inv && inv.used), open: new Date() <= DEADLINE });
+  }
+  if (p.stats) {
+    if (!findInvite(p.k)) return reply({ ok: false, error: 'badkey' });
+    return reply(stats());
+  }
+  return reply({ ok: true });
+}
+
+function getInviteSheet() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  let sh = ss.getSheetByName(INVITE_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(INVITE_SHEET);
+    sh.appendRow(['編號', '邀請碼', '狀態', '送出時間', '暱稱']);
+    sh.setFrozenRows(1);
+    sh.getRange(1, 1, 1, 5).setFontWeight('bold');
+    if (INVITE_CODES.length) {
+      sh.getRange(2, 1, INVITE_CODES.length, 2).setNumberFormat('@').setValues(INVITE_CODES);
+    }
+  }
+  return sh;
+}
+
+// 依邀請碼找到那一列；狀態欄填「停用」即可讓該碼失效
+function findInvite(code) {
+  code = String(code || '').trim().toUpperCase();
+  if (!code) return null;
+  const sh = getInviteSheet();
+  const last = sh.getLastRow();
+  if (last < 2) return null;
+  const rows = sh.getRange(2, 1, last - 1, 3).getValues();
+  for (let i = 0; i < rows.length; i++) {
+    if (String(rows[i][1]).trim().toUpperCase() === code) {
+      const status = String(rows[i][2]).trim();
+      if (status === '停用') return null;
+      return { sheet: sh, row: i + 2, label: String(rows[i][0]), used: status === '已使用' };
+    }
+  }
+  return null;
 }
 
 // 匯總統計（不含暱稱），供網頁「戰況總覽」使用
@@ -103,6 +153,9 @@ function getSheet() {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   let sheet = ss.getSheetByName(SHEET_NAME);
   if (!sheet) sheet = ss.insertSheet(SHEET_NAME);
+  if (sheet.getLastRow() > 0 && sheet.getRange(1, HEADER.length).getValue() !== HEADER[HEADER.length - 1]) {
+    sheet.getRange(1, 1, 1, HEADER.length).setValues([HEADER]).setFontWeight('bold');
+  }
   if (sheet.getLastRow() === 0) {
     sheet.appendRow(HEADER);
     sheet.setFrozenRows(1);

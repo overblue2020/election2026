@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>決戰 2026 預測積分賽</title>
+<meta name="robots" content="noindex,nofollow">
 <meta property="og:title" content="決戰 2026 預測積分賽">
 <meta property="og:description" content="2026 九合一縣市長選舉預測積分賽">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -226,6 +227,25 @@ let step = 0;
 let S = {nickname:"",taipei:"",margin:"",ntpc:"",khh:"",counties:{},q1:"",q2:"",q3:null};
 let sealedDoc=null, saving=false;
 try{const d=JSON.parse(localStorage.getItem("e26sealed_r2")||"null"); if(d){sealedDoc=d; step=9}}catch(e){}
+// 邀請碼：網址 ?k=XXXX，記在本機，之後再開不必重帶
+let KEY=""; let gate="checking";
+try{ KEY=(new URLSearchParams(location.search).get("k")||"").trim().toUpperCase(); if(KEY) localStorage.setItem("e26key",KEY); else KEY=(localStorage.getItem("e26key")||"").toUpperCase(); }catch(e){}
+async function checkKey(){
+  if(!KEY){gate="none";return}
+  try{ const j=await (await fetch(API_URL+"?check="+encodeURIComponent(KEY)+"&t="+Date.now())).json();
+    gate = !j.valid ? "bad" : (j.used ? "used" : "ok");
+  }catch(e){ gate="error"; }
+}
+function gateView(){
+  const msg={checking:["驗證邀請中…","正在確認你的邀請連結。"],
+    none:["僅限受邀者參加","請使用主辦方提供的專屬邀請連結開啟本頁。"],
+    bad:["邀請連結無效","這個邀請連結不正確或已停用，請向主辦方確認。"],
+    used:["這組邀請已送出預測","每組邀請連結限送出一次。你可以查看目前大家的預測。"],
+    error:["暫時無法驗證","請檢查網路後重新整理頁面。"]}[gate];
+  return `<div class="hero"><div class="kicker">2026 九合一・縣市長</div><h1>決戰<br><span>2026</span></h1></div>
+  <div class="panel stack"><h3 style="font-size:22px">${msg[0]}</h3><p class="note" style="margin:0">${msg[1]}</p>
+  ${gate==="used"?'<button type="button" class="btn primary" id="gateStats">查看大家的預測</button>':""}</div>`;
+}
 
 try{const d=JSON.parse(localStorage.getItem("e26draft_r2")||"null"); if(d) S=Object.assign(S,d)}catch(e){}
 const saveDraft=()=>{try{localStorage.setItem("e26draft_r2",JSON.stringify(S))}catch(e){}};
@@ -282,6 +302,12 @@ function render(){
   document.getElementById("stepNo").textContent=step===10?"戰況總覽":`第 ${step+1} / 10 關`;
   document.getElementById("track").innerHTML=STEPS.map((_,i)=>`<i class="${i<step?'done':i===step?'on':''}"></i>`).join("");
   let h="";
+  if(gate!=="ok" && step<9){
+    app.innerHTML=gateView();
+    const gs=document.getElementById("gateStats"); if(gs) gs.onclick=()=>{step=10;stats=null;render();loadStats()};
+    document.getElementById("back").hidden=true; document.getElementById("next").hidden=true; document.getElementById("hint").textContent="";
+    return;
+  }
   if(step===0){
     h=`<div class="hero"><div class="kicker">2026 九合一・縣市長</div><h1>決戰<br><span>2026</span></h1></div>
       <div class="stack">
@@ -403,7 +429,7 @@ function tick(){
 }
 setInterval(()=>{if(step===0)tick()},1000);
 
-document.getElementById("back").onclick=()=>{if(step===10){step=9;render();return} if(step>0){step--;render()}};
+document.getElementById("back").onclick=()=>{if(step===10){step=sealedDoc?9:0;render();return} if(step>0){step--;render()}};
 document.getElementById("next").onclick=async()=>{
   const next=document.getElementById("next"), hint=document.getElementById("hint");
   if(next.getAttribute("aria-disabled")==="true"){hint.textContent=next.dataset.err||"";return}
@@ -411,13 +437,13 @@ document.getElementById("next").onclick=async()=>{
   if(step<8){step++;render();return}
   if(closed()){hint.textContent="已過截止時間";return}
   saving=true; renderNav();
-  const doc={nickname:S.nickname.trim(),taipei:S.taipei,margin:+S.margin,ntpc:S.ntpc,khh:S.khh,counties:{...S.counties},q1:S.q1,q2:+S.q2,q3:S.q3,submittedAt:new Date().toISOString()};
+  const doc={key:KEY,nickname:S.nickname.trim(),taipei:S.taipei,margin:+S.margin,ntpc:S.ntpc,khh:S.khh,counties:{...S.counties},q1:S.q1,q2:+S.q2,q3:S.q3,submittedAt:new Date().toISOString()};
   try{
     const res=await fetch(API_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(doc)});
     const out=await res.json();
     if(!out.ok){
       saving=false; renderNav();
-      const msg={duplicate:"這個暱稱已經有人用過了，請回第 1 關換一個暱稱。",closed:"已過截止時間，停止收件。",invalid:"資料不完整，請檢查每一關是否都已作答。"}[out.error]||"送出失敗，請稍後再試一次。";
+      const msg={used:"這組邀請連結已經送出過預測。",badkey:"邀請連結無效，請向主辦方確認。",duplicate:"這個暱稱已經有人用過了，請回第 1 關換一個暱稱。",closed:"已過截止時間，停止收件。",invalid:"資料不完整，請檢查每一關是否都已作答。"}[out.error]||"送出失敗，請稍後再試一次。";
       document.getElementById("hint").textContent=msg; return;
     }
     sealedDoc={...doc,_fresh:true}; step=9; saving=false;
@@ -442,7 +468,7 @@ let stats=null, statsErr="";
 async function loadStats(){
   statsErr="";
   try{
-    const r=await fetch(API_URL+"?stats=1&t="+Date.now());
+    const r=await fetch(API_URL+"?stats=1&k="+encodeURIComponent(KEY)+"&t="+Date.now());
     const j=await r.json();
     if(!j.ok) throw 0;
     stats=j;
@@ -485,6 +511,7 @@ function statsView(){
 }
 
 render();
+checkKey().then(()=>render());
 </script>
 </body>
 </html>
