@@ -283,8 +283,7 @@ function render(){
   document.getElementById("track").innerHTML=STEPS.map((_,i)=>`<i class="${i<step?'done':i===step?'on':''}"></i>`).join("");
   let h="";
   if(step===0){
-    h=`<div class="hero"><div class="kicker">2026 九合一・縣市長</div><h1>決戰<br><span>2026</span></h1>
-      <p>預測 22 縣市首長勝負，押中積分、搶占排行。不賭錢，只賭眼光。投票日 11 月 28 日。</p></div>
+    h=`<div class="hero"><div class="kicker">2026 九合一・縣市長</div><h1>決戰<br><span>2026</span></h1></div>
       <div class="stack">
       <div class="panel stack"><label class="lbl">距離封關（11/27 23:59）</label><div class="countdown" id="cd"></div></div>
       <div class="panel stack"><div><label class="lbl" for="nick">你的暱稱</label>
