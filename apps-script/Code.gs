@@ -65,8 +65,38 @@ function doPost(e) {
   }
 }
 
-function doGet() {
+function doGet(e) {
+  if (e && e.parameter && e.parameter.stats) return reply(stats());
   return reply({ ok: true, open: new Date() <= DEADLINE });
+}
+
+// 匯總統計（不含暱稱），供網頁「戰況總覽」使用
+function stats() {
+  const sheet = getSheet();
+  const last = sheet.getLastRow();
+  const raceCols = { '台北市': 2, '新北市': 4, '高雄市': 5 };
+  COUNTIES.forEach((c, i) => { raceCols[c] = 6 + i; });
+  const out = { ok: true, n: 0, races: {}, margin: { avg: 0, median: 0 }, q1: { yes: 0, no: 0 }, q2: { avg: 0 }, q3: { avg: 0 } };
+  Object.keys(raceCols).forEach(r => { out.races[r] = {}; });
+  if (last < 2) return out;
+  const rows = sheet.getRange(2, 1, last - 1, HEADER.length).getValues().filter(r => String(r[1]).trim());
+  out.n = rows.length;
+  if (!rows.length) return out;
+  rows.forEach(r => {
+    Object.keys(raceCols).forEach(name => {
+      const v = String(r[raceCols[name]]);
+      out.races[name][v] = (out.races[name][v] || 0) + 1;
+    });
+    if (r[25] === '當選') out.q1.yes++; else out.q1.no++;
+  });
+  const nums = col => rows.map(r => Number(r[col])).filter(x => !isNaN(x));
+  const avg = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0;
+  const m = nums(3).sort((a, b) => a - b);
+  out.margin.avg = Math.round(avg(m));
+  out.margin.median = m.length % 2 ? m[(m.length - 1) / 2] : Math.round((m[m.length / 2 - 1] + m[m.length / 2]) / 2);
+  out.q2.avg = Math.round(avg(nums(26)));
+  out.q3.avg = Math.round(avg(nums(27)) * 10) / 10;
+  return out;
 }
 
 function getSheet() {

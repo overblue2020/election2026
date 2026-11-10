@@ -138,6 +138,21 @@ nav.cmd .wrap{display:flex;gap:10px;align-items:center}
 .full table.sum{min-width:1800px;font-size:13px}
 .full td,.full th{white-space:nowrap}
 .full tr>*:first-child{position:sticky;left:0;background:var(--lacquer);z-index:1}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.kpis div{background:var(--lacquer);border:1px solid var(--line);border-radius:6px;padding:12px 14px;font-variant-numeric:tabular-nums}
+.kpis small{display:block;font-size:12px;color:var(--muted)}
+.kpis b{font-family:var(--display);font-size:30px;color:var(--gold)}
+.kpis span{font-size:12px;color:var(--muted);margin-left:4px}
+.st-row{display:flex;flex-direction:column;gap:6px;padding-block:4px}
+.st-h{font-size:15px}
+.st-bar{display:flex;gap:2px;height:12px;border-radius:6px;overflow:hidden;background:var(--line)}
+.st-bar i{display:block;height:100%}
+.st-bar i.blue,.dot.blue{background:var(--blue)} .st-bar i.green,.dot.green{background:var(--green)}
+.st-bar i.gold,.dot.gold{background:var(--gold)} .st-bar i.none,.dot.none{background:var(--line)}
+.st-legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.st-legend b{color:var(--fg)}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:middle}
+.st-num{font-size:14px;color:var(--muted)} .st-num b{font-family:var(--display);font-size:22px;color:var(--gold)}
 @media (max-width:420px){.duel{grid-template-columns:1fr 1fr}.vs{display:none}.tier{grid-template-columns:60px 1fr}.tier .n{font-size:32px}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
@@ -167,7 +182,8 @@ const B = c => c==="民進黨" ? "green" : "blue";
 const CORE = {
   taipei:{name:"台北市",pts:"30 分｜當選人 15 ＋ 票差 15",tag:"核心戰場",
     c:[{n:"蔣萬安",p:"國民黨",x:"現任"},{n:"沈伯洋",p:"民進黨"}],
-    battle:"首都決戰！蔣萬安苦戰力拚連任，沈伯洋率「洋流」大軍兵臨城下。"},
+    battle:"首都決戰！蔣萬安苦戰力拚連任，沈伯洋率「洋流」大軍兵臨城下。",
+    note:"票差規則：預測第一名比第二名多幾票。猜中當選人的參賽者中，預測票差最接近開票結果者，獨得票差 15 分。"},
   ntpc:{name:"新北市",pts:"10 分｜猜中當選人",tag:"激戰區",
     c:[{n:"李四川",p:"國民黨"},{n:"蘇巧慧",p:"民進黨"}],
     battle:"侯友宜交出帥印，李四川接旗出陣；蘇巧慧苦戰九百日直取板橋。兩軍貼身肉搏，誰能入主新北耶誕城？"},
@@ -248,7 +264,7 @@ function duel(key){
 function coreView(key,extra=""){
   const d=CORE[key];
   return `<div class="sec-title"><span class="tag">${d.tag}</span><h2>${d.name}</h2><span class="pts">${d.pts}</span></div>
-  <div class="stack"><div class="battle">${d.battle}<small>${SRC}</small></div>${duel(key)}${extra}</div>`;
+  <div class="stack"><div class="battle">${d.battle}<small>${d.note||SRC}</small></div>${duel(key)}${extra}</div>`;
 }
 function countyView(list,title,sub){
   return `<div class="sec-title"><span class="tag">一般選區</span><h2>${title}</h2><span class="pts">每縣市 2 分｜已押注 ${list.filter(([n])=>S.counties[n]).length} / ${list.length}</span></div>
@@ -260,8 +276,8 @@ function countyView(list,title,sub){
 }
 
 function render(){
-  document.getElementById("stepName").textContent=STEPS[step];
-  document.getElementById("stepNo").textContent=`第 ${step+1} / 10 關`;
+  document.getElementById("stepName").textContent=step===10?"戰況":STEPS[step];
+  document.getElementById("stepNo").textContent=step===10?"戰況總覽":`第 ${step+1} / 10 關`;
   document.getElementById("track").innerHTML=STEPS.map((_,i)=>`<i class="${i<step?'done':i===step?'on':''}"></i>`).join("");
   let h="";
   if(step===0){
@@ -329,6 +345,8 @@ function render(){
       <tr><th>台北市</th><td class="v">${esc(d.taipei)}・差 ${Number(d.margin).toLocaleString()} 票</td></tr>
       <tr><th>新北市</th><td class="v">${esc(d.ntpc)}</td></tr><tr><th>高雄市</th><td class="v">${esc(d.khh)}</td></tr>
       <tr><th>藍綠席次</th><td class="v">綠 ${d.q3}・藍 ${22-d.q3}</td></tr></table></div>`;
+  } else if(step===10){
+    h=statsView();
   }
   app.innerHTML=h;
   bind(); renderNav(); window.scrollTo(0,0);
@@ -337,7 +355,14 @@ function render(){
 function renderNav(){
   const back=document.getElementById("back"), next=document.getElementById("next"), hint=document.getElementById("hint");
   back.hidden = step===0||step===9;
-  next.hidden = step===9;
+  next.hidden = step===10;
+  if(step===9||step===10){
+    back.hidden = step===9;
+    back.textContent = step===10 ? "我的預測" : "上一關";
+    next.textContent = "查看大家的預測";
+    next.setAttribute("aria-disabled","false"); next.dataset.err=""; hint.textContent=""; return;
+  }
+  back.textContent = "上一關";
   const err=valid(step);
   let label = step===0?"出征":step===8?"封關送出":"下一關";
   next.textContent = saving?"送出中…":label;
@@ -377,10 +402,11 @@ function tick(){
 }
 setInterval(()=>{if(step===0)tick()},1000);
 
-document.getElementById("back").onclick=()=>{if(step>0){step--;render()}};
+document.getElementById("back").onclick=()=>{if(step===10){step=9;render();return} if(step>0){step--;render()}};
 document.getElementById("next").onclick=async()=>{
   const next=document.getElementById("next"), hint=document.getElementById("hint");
   if(next.getAttribute("aria-disabled")==="true"){hint.textContent=next.dataset.err||"";return}
+  if(step===9){step=10;stats=null;render();loadStats();return}
   if(step<8){step++;render();return}
   if(closed()){hint.textContent="已過截止時間";return}
   saving=true; renderNav();
@@ -409,6 +435,52 @@ function burst(){
   const cols=["#dcaa4a","#c2382b","#f3ead9","#4a86e8","#33ad6a"];
   const P=Array.from({length:160},()=>({x:c.width/2,y:c.height*.35,vx:(Math.random()-.5)*14,vy:Math.random()*-14-4,r:Math.random()*6+3,c:cols[Math.random()*5|0],a:Math.random()*6,va:(Math.random()-.5)*.3}));
   let t=0;(function f(){x.clearRect(0,0,c.width,c.height);P.forEach(p=>{p.vy+=.35;p.x+=p.vx;p.y+=p.vy;p.a+=p.va;x.save();x.translate(p.x,p.y);x.rotate(p.a);x.fillStyle=p.c;x.fillRect(-p.r,-p.r/2,p.r*2,p.r);x.restore()});if(++t<160)requestAnimationFrame(f);else x.clearRect(0,0,c.width,c.height)})();
+}
+
+let stats=null, statsErr="";
+async function loadStats(){
+  statsErr="";
+  try{
+    const r=await fetch(API_URL+"?stats=1&t="+Date.now());
+    const j=await r.json();
+    if(!j.ok) throw 0;
+    stats=j;
+  }catch(e){ statsErr="暫時讀不到戰況，請稍後再試。"; }
+  if(step===10) render();
+}
+const pct=(c,n)=>n?Math.round(c/n*100):0;
+function raceBar(name,cands,counts,n){
+  return `<div class="st-row"><div class="st-h"><b>${name}</b></div>
+    <div class="st-bar">${cands.map(([cn,p])=>{const c=counts[cn]||0;return c?`<i class="${camp(p)}" style="flex:${c}"></i>`:""}).join("")||'<i class="none" style="flex:1"></i>'}</div>
+    <div class="st-legend">${cands.map(([cn,p])=>`<span><i class="dot ${camp(p)}"></i>${cn} <b>${pct(counts[cn]||0,n)}%</b></span>`).join("")}</div></div>`;
+}
+function statsView(){
+  const head=`<div class="sec-title"><span class="tag">戰況總覽</span><h2>大家怎麼押</h2><span class="pts">${stats?`已有 ${stats.n} 人送出預測`:"讀取中…"}</span></div>`;
+  if(statsErr) return head+`<p class="warn">${statsErr}</p>`;
+  if(!stats) return head+`<div class="panel"><p class="note" style="margin:0">正在向主帥營調閱戰報…</p></div>`;
+  const n=stats.n, R=stats.races;
+  if(!n) return head+`<div class="panel"><p class="note" style="margin:0">還沒有人送出預測。</p></div>`;
+  const core=[["taipei","台北市"],["ntpc","新北市"],["khh","高雄市"]].map(([k,name])=>raceBar(name,CORE[k].c.map(c=>[c.n,c.p]),R[name]||{},n)).join("");
+  const rest=list=>list.map(([name,,cs])=>raceBar(name,cs,R[name]||{},n)).join("");
+  const g=stats.q3.avg;
+  return head+`<div class="stack">
+  <div class="kpis">
+    <div><small>台北票差・平均預估</small><b>${stats.margin.avg.toLocaleString()}</b><span>票</span></div>
+    <div><small>台北票差・中位數</small><b>${stats.margin.median.toLocaleString()}</b><span>票</span></div>
+  </div>
+  <div class="panel stack"><h3 style="font-size:18px">核心與激戰區</h3>${core}</div>
+  <div class="panel stack"><h3 style="font-size:18px">北中東</h3>${rest(NORTH)}</div>
+  <div class="panel stack"><h3 style="font-size:18px">南部・離島</h3>${rest(SOUTH)}</div>
+  <div class="panel stack"><h3 style="font-size:18px">三小加分題</h3>
+    <div class="st-row"><div class="st-h"><b>1. 佀廣洋是否當選</b></div>
+      <div class="st-bar">${stats.q1.yes?`<i class="gold" style="flex:${stats.q1.yes}"></i>`:""}${stats.q1.no?`<i class="none" style="flex:${stats.q1.no}"></i>`:""}</div>
+      <div class="st-legend"><span><i class="dot gold"></i>當選 <b>${pct(stats.q1.yes,n)}%</b></span><span><i class="dot none"></i>落選 <b>${pct(stats.q1.no,n)}%</b></span></div></div>
+    <div class="st-row"><div class="st-h"><b>2. 新北數字議員得票數</b></div><div class="st-num">平均預估 <b>${stats.q2.avg.toLocaleString()}</b> 票</div></div>
+    <div class="st-row"><div class="st-h"><b>3. 藍綠席次</b></div>
+      <div class="st-bar"><i class="green" style="flex:${g}"></i><i class="blue" style="flex:${22-g}"></i></div>
+      <div class="st-legend"><span><i class="dot green"></i>民進黨 平均 <b>${g}</b> 席</span><span><i class="dot blue"></i>泛藍 平均 <b>${Math.round((22-g)*10)/10}</b> 席</span></div></div>
+  </div>
+  <p class="note">每次打開此頁都會顯示最新統計。不公開個人預測。</p></div>`;
 }
 
 render();
