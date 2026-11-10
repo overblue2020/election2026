@@ -1,9 +1,11 @@
 /**
  * 決戰 2026 預測積分賽：收件程式
- * 貼到 Google 試算表的「擴充功能 > Apps Script」，部署成「網頁應用程式」。
+ * 貼到 Apps Script 專案，部署成「網頁應用程式」。
  * 每份預測會新增一列到「預測名單」工作表。
  */
 
+// 收件試算表的 ID（網址 /d/ 與 /edit 之間那段）
+const SPREADSHEET_ID = '1VvcyPCfXGYOOrgpLO6jR7gXryaDYoL3lkKvBbndQ4lc';
 const SHEET_NAME = '預測名單';
 const DEADLINE = new Date('2026-11-27T23:59:00+08:00');
 
@@ -68,7 +70,7 @@ function doGet() {
 }
 
 function getSheet() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   let sheet = ss.getSheetByName(SHEET_NAME);
   if (!sheet) sheet = ss.insertSheet(SHEET_NAME);
   if (sheet.getLastRow() === 0) {
