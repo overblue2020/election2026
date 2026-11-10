@@ -225,10 +225,10 @@ const STEPS = ["入營","軍令","台北","新北","高雄","北中東","南部�
 let step = 0;
 let S = {nickname:"",taipei:"",margin:"",ntpc:"",khh:"",counties:{},q1:"",q2:"",q3:null};
 let sealedDoc=null, saving=false;
-try{const d=JSON.parse(localStorage.getItem("e26sealed")||"null"); if(d){sealedDoc=d; step=9}}catch(e){}
+try{const d=JSON.parse(localStorage.getItem("e26sealed_r2")||"null"); if(d){sealedDoc=d; step=9}}catch(e){}
 
-try{const d=JSON.parse(localStorage.getItem("e26draft")||"null"); if(d) S=Object.assign(S,d)}catch(e){}
-const saveDraft=()=>{try{localStorage.setItem("e26draft",JSON.stringify(S))}catch(e){}};
+try{const d=JSON.parse(localStorage.getItem("e26draft_r2")||"null"); if(d) S=Object.assign(S,d)}catch(e){}
+const saveDraft=()=>{try{localStorage.setItem("e26draft_r2",JSON.stringify(S))}catch(e){}};
 const closed=()=>Date.now()>DEADLINE.getTime();
 const app=document.getElementById("app");
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -422,7 +422,7 @@ document.getElementById("next").onclick=async()=>{
       document.getElementById("hint").textContent=msg; return;
     }
     sealedDoc={...doc,_fresh:true}; step=9; saving=false;
-    try{localStorage.removeItem("e26draft"); localStorage.setItem("e26sealed",JSON.stringify(doc))}catch(e){}
+    try{localStorage.removeItem("e26draft_r2"); localStorage.setItem("e26sealed_r2",JSON.stringify(doc))}catch(e){}
     render(); burst();
   }catch(e){
     saving=false; renderNav();
