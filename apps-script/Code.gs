@@ -7,6 +7,7 @@
 // 收件試算表的 ID（網址 /d/ 與 /edit 之間那段）
 const SPREADSHEET_ID = '1VvcyPCfXGYOOrgpLO6jR7gXryaDYoL3lkKvBbndQ4lc';
 const SHEET_NAME = '預測名單';
+const TEST_SHEET_NAME = '測試名單'; // test.html 送出的資料寫這裡，不計入正式比賽
 const DEADLINE = new Date('2026-11-27T23:59:00+08:00');
 const INVITE_SHEET = '邀請碼';
 // 邀請碼只填在 Apps Script 裡，不要提交到 GitHub。格式：['0001', 'XXXXXXXX'], ...
@@ -35,9 +36,14 @@ function doPost(e) {
     if (new Date() > DEADLINE) return reply({ ok: false, error: 'closed' });
 
     const d = JSON.parse(e.postData.contents);
-    const invite = findInvite(d.key);
-    if (!invite) return reply({ ok: false, error: 'badkey' });
-    if (invite.used) return reply({ ok: false, error: 'used' });
+    const test = d.test === true;
+    // 邀請碼改為選填：有帶就核對並記錄，沒帶也可送出
+    let invite = null;
+    if (d.key) {
+      invite = findInvite(d.key);
+      if (!invite) return reply({ ok: false, error: 'badkey' });
+      if (invite.used) return reply({ ok: false, error: 'used' });
+    }
     const nickname = String(d.nickname || '').trim().slice(0, 20);
     const counties = d.counties || {};
     const complete =
@@ -47,7 +53,7 @@ function doPost(e) {
       Number(d.q3) >= 0 && Number(d.q3) <= 22;
     if (!complete) return reply({ ok: false, error: 'invalid' });
 
-    const sheet = getSheet();
+    const sheet = getSheet(test);
     const last = sheet.getLastRow();
     if (last > 1) {
       const names = sheet.getRange(2, 2, last - 1, 1).getValues().map(r => String(r[0]).trim().toLowerCase());
@@ -63,9 +69,9 @@ function doPost(e) {
       Number(d.q2),
       Number(d.q3),
       22 - Number(d.q3),
-      invite.label
+      invite ? invite.label : ''
     ]);
-    invite.sheet.getRange(invite.row, 3, 1, 3).setValues([['已使用', new Date(), nickname]]);
+    if (invite) invite.sheet.getRange(invite.row, 3, 1, 3).setValues([['已使用', new Date(), nickname]]);
     return reply({ ok: true });
   } catch (err) {
     return reply({ ok: false, error: 'server' });
@@ -80,10 +86,7 @@ function doGet(e) {
     const inv = findInvite(p.check);
     return reply({ ok: true, valid: !!inv, used: !!(inv && inv.used), open: new Date() <= DEADLINE });
   }
-  if (p.stats) {
-    if (!findInvite(p.k)) return reply({ ok: false, error: 'badkey' });
-    return reply(stats());
-  }
+  if (p.stats) return reply(stats(p.test === '1'));
   return reply({ ok: true });
 }
 
@@ -121,8 +124,8 @@ function findInvite(code) {
 }
 
 // 匯總統計（不含暱稱），供網頁「戰況總覽」使用
-function stats() {
-  const sheet = getSheet();
+function stats(test) {
+  const sheet = getSheet(test);
   const last = sheet.getLastRow();
   const raceCols = { '台北市': 2, '新北市': 4, '高雄市': 5 };
   COUNTIES.forEach((c, i) => { raceCols[c] = 6 + i; });
@@ -149,10 +152,11 @@ function stats() {
   return out;
 }
 
-function getSheet() {
+function getSheet(test) {
+  const name = test ? TEST_SHEET_NAME : SHEET_NAME;
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  let sheet = ss.getSheetByName(SHEET_NAME);
-  if (!sheet) sheet = ss.insertSheet(SHEET_NAME);
+  let sheet = ss.getSheetByName(name);
+  if (!sheet) sheet = ss.insertSheet(name);
   if (sheet.getLastRow() > 0 && sheet.getRange(1, HEADER.length).getValue() !== HEADER[HEADER.length - 1]) {
     sheet.getRange(1, 1, 1, HEADER.length).setValues([HEADER]).setFontWeight('bold');
   }
