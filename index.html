@@ -167,6 +167,7 @@ nav.cmd .wrap{display:flex;gap:10px;align-items:center}
   <div class="track" id="track"></div>
 </div></header>
 
+<div class="wrap" id="testBanner" hidden><p class="warn" style="margin:12px 0 0">測試版：這裡送出的資料只寫入「測試名單」，不計入正式比賽。</p></div>
 <main class="wrap" id="app"></main>
 
 <nav class="cmd"><div class="wrap" style="flex-wrap:wrap">
@@ -226,29 +227,12 @@ const STEPS = ["入營","軍令","台北","新北","高雄","北中東","南部�
 let step = 0;
 let S = {nickname:"",taipei:"",margin:"",ntpc:"",khh:"",counties:{},q1:"",q2:"",q3:null};
 let sealedDoc=null, saving=false;
-try{const d=JSON.parse(localStorage.getItem("e26sealed_r2")||"null"); if(d){sealedDoc=d; step=9}}catch(e){}
-// 邀請碼：網址 ?k=XXXX，記在本機，之後再開不必重帶
-let KEY=""; let gate="checking";
-try{ KEY=(new URLSearchParams(location.search).get("k")||"").trim().toUpperCase(); if(KEY) localStorage.setItem("e26key",KEY); else KEY=(localStorage.getItem("e26key")||"").toUpperCase(); }catch(e){}
-async function checkKey(){
-  if(!KEY){gate="none";return}
-  try{ const j=await (await fetch(API_URL+"?check="+encodeURIComponent(KEY)+"&t="+Date.now())).json();
-    gate = !j.valid ? "bad" : (j.used ? "used" : "ok");
-  }catch(e){ gate="error"; }
-}
-function gateView(){
-  const msg={checking:["驗證邀請中…","正在確認你的邀請連結。"],
-    none:["僅限受邀者參加","請使用主辦方提供的專屬邀請連結開啟本頁。"],
-    bad:["邀請連結無效","這個邀請連結不正確或已停用，請向主辦方確認。"],
-    used:["這組邀請已送出預測","每組邀請連結限送出一次。你可以查看目前大家的預測。"],
-    error:["暫時無法驗證","請檢查網路後重新整理頁面。"]}[gate];
-  return `<div class="hero"><div class="kicker">2026 九合一・縣市長</div><h1>決戰<br><span>2026</span></h1></div>
-  <div class="panel stack"><h3 style="font-size:22px">${msg[0]}</h3><p class="note" style="margin:0">${msg[1]}</p>
-  ${gate==="used"?'<button type="button" class="btn primary" id="gateStats">查看大家的預測</button>':""}</div>`;
-}
-
-try{const d=JSON.parse(localStorage.getItem("e26draft_r2")||"null"); if(d) S=Object.assign(S,d)}catch(e){}
-const saveDraft=()=>{try{localStorage.setItem("e26draft_r2",JSON.stringify(S))}catch(e){}};
+// 測試版（test.html）資料寫入「測試名單」，不計入正式比賽，本機紀錄也分開存
+const TEST = /test\.html$/.test(location.pathname);
+const SK = TEST ? "e26t_" : "e26r3_";
+try{const d=JSON.parse(localStorage.getItem(SK+"sealed")||"null"); if(d){sealedDoc=d; step=9}}catch(e){}
+try{const d=JSON.parse(localStorage.getItem(SK+"draft")||"null"); if(d) S=Object.assign(S,d)}catch(e){}
+const saveDraft=()=>{try{localStorage.setItem(SK+"draft",JSON.stringify(S))}catch(e){}};
 const closed=()=>Date.now()>DEADLINE.getTime();
 const app=document.getElementById("app");
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -302,19 +286,13 @@ function render(){
   document.getElementById("stepNo").textContent=step===10?"戰況總覽":`第 ${step+1} / 10 關`;
   document.getElementById("track").innerHTML=STEPS.map((_,i)=>`<i class="${i<step?'done':i===step?'on':''}"></i>`).join("");
   let h="";
-  if(gate!=="ok" && step<9){
-    app.innerHTML=gateView();
-    const gs=document.getElementById("gateStats"); if(gs) gs.onclick=()=>{step=10;stats=null;render();loadStats()};
-    document.getElementById("back").hidden=true; document.getElementById("next").hidden=true; document.getElementById("hint").textContent="";
-    return;
-  }
   if(step===0){
     h=`<div class="hero"><div class="kicker">2026 九合一・縣市長</div><h1>決戰<br><span>2026</span></h1></div>
       <div class="stack">
       <div class="panel stack"><label class="lbl">距離封關（11/27 23:59）</label><div class="countdown" id="cd"></div></div>
       <div class="panel stack"><div><label class="lbl" for="nick">你的暱稱</label>
         <input type="text" id="nick" maxlength="20" placeholder="例如：竹北鐵口直斷" value="${esc(S.nickname)}"></div>
-        <p class="note" style="margin:0">每人限送出一次，送出後不得修改。</p>
+        <p class="warn" style="margin:0">每人只能下注一次，送出後不得修改。</p>
         <div id="statusBox"></div></div></div>`;
   } else if(step===1){
     h=`<div class="sec-title"><span class="tag">軍令</span><h2>遊戲規則</h2><span class="pts">總分 100 分</span></div>
@@ -329,7 +307,7 @@ function render(){
       <p>台北市是全國焦點，同時考驗暴風圈中的我們選情的預判精準性，權重最高。新北、高雄人口龐大且戰況膠著。其餘縣市也影響2028大選風向。加分題讓輸贏更難猜。</p>
       <h3 style="font-size:20px;margin:16px 0 10px">為何這一戰關鍵</h3>
       <p>這是 2024 大選後第一場全國性地方選舉，六都與 16 縣市同日改選，被各界視為 2028 總統大選的前哨戰。多個縣市首長任期屆滿、世代交接，藍白合作首度在地方全面登場，許多縣市戰況空前膠著。</p>
-      <p class="note">計分以中央選舉委員會正式公告為準。同分時，台北票差誤差較小者勝。</p></div></div>`;
+      <p class="note">每人只能下注一次。計分以中央選舉委員會正式公告為準。同分時，台北票差誤差較小者勝。</p></div></div>`;
   } else if(step===2){
     h=coreView("taipei",`<div class="panel"><label class="lbl" for="margin">預測票差：第一名比第二名多幾票？</label>
       <input type="number" id="margin" inputmode="numeric" min="1" step="1" placeholder="例如 35000" value="${esc(S.margin)}">
@@ -363,7 +341,7 @@ function render(){
       ${row("加分 1｜佀廣洋",S.q1==="是"?"當選":S.q1==="否"?"落選":"",7)}
       ${row("加分 2｜得票數",S.q2!==""?Number(S.q2).toLocaleString()+" 票":"",7)}
       ${row("加分 3｜席次",S.q3!==null?`綠 ${S.q3}・藍 ${22-S.q3}`:"",7)}
-    </table></div><p class="warn">按下「封關送出」後無法再修改。</p></div>`;
+    </table></div><p class="warn">每人只能下注一次。按下「封關送出」後無法再修改。</p></div>`;
   } else if(step===9){
     const d=sealedDoc||S;
     h=`<div class="sealed"><div class="stamp ${sealedDoc&&sealedDoc._fresh?'go':''}">封</div><h2>預測已封存</h2>
@@ -429,7 +407,7 @@ function tick(){
 }
 setInterval(()=>{if(step===0)tick()},1000);
 
-document.getElementById("back").onclick=()=>{if(step===10){step=sealedDoc?9:0;render();return} if(step>0){step--;render()}};
+document.getElementById("back").onclick=()=>{if(step===10){step=9;render();return} if(step>0){step--;render()}};
 document.getElementById("next").onclick=async()=>{
   const next=document.getElementById("next"), hint=document.getElementById("hint");
   if(next.getAttribute("aria-disabled")==="true"){hint.textContent=next.dataset.err||"";return}
@@ -437,17 +415,17 @@ document.getElementById("next").onclick=async()=>{
   if(step<8){step++;render();return}
   if(closed()){hint.textContent="已過截止時間";return}
   saving=true; renderNav();
-  const doc={key:KEY,nickname:S.nickname.trim(),taipei:S.taipei,margin:+S.margin,ntpc:S.ntpc,khh:S.khh,counties:{...S.counties},q1:S.q1,q2:+S.q2,q3:S.q3,submittedAt:new Date().toISOString()};
+  const doc={test:TEST,nickname:S.nickname.trim(),taipei:S.taipei,margin:+S.margin,ntpc:S.ntpc,khh:S.khh,counties:{...S.counties},q1:S.q1,q2:+S.q2,q3:S.q3,submittedAt:new Date().toISOString()};
   try{
     const res=await fetch(API_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(doc)});
     const out=await res.json();
     if(!out.ok){
       saving=false; renderNav();
-      const msg={used:"這組邀請連結已經送出過預測。",badkey:"邀請連結無效，請向主辦方確認。",duplicate:"這個暱稱已經有人用過了，請回第 1 關換一個暱稱。",closed:"已過截止時間，停止收件。",invalid:"資料不完整，請檢查每一關是否都已作答。"}[out.error]||"送出失敗，請稍後再試一次。";
+      const msg={duplicate:"這個暱稱已經有人用過了，請回第 1 關換一個暱稱。",closed:"已過截止時間，停止收件。",invalid:"資料不完整，請檢查每一關是否都已作答。"}[out.error]||"送出失敗，請稍後再試一次。";
       document.getElementById("hint").textContent=msg; return;
     }
     sealedDoc={...doc,_fresh:true}; step=9; saving=false;
-    try{localStorage.removeItem("e26draft_r2"); localStorage.setItem("e26sealed_r2",JSON.stringify(doc))}catch(e){}
+    try{localStorage.removeItem(SK+"draft"); localStorage.setItem(SK+"sealed",JSON.stringify(doc))}catch(e){}
     render(); burst();
   }catch(e){
     saving=false; renderNav();
@@ -468,7 +446,7 @@ let stats=null, statsErr="";
 async function loadStats(){
   statsErr="";
   try{
-    const r=await fetch(API_URL+"?stats=1&k="+encodeURIComponent(KEY)+"&t="+Date.now());
+    const r=await fetch(API_URL+"?stats=1"+(TEST?"&test=1":"")+"&t="+Date.now());
     const j=await r.json();
     if(!j.ok) throw 0;
     stats=j;
@@ -510,8 +488,8 @@ function statsView(){
   <p class="note">每次打開此頁都會顯示最新統計。不公開個人預測。</p></div>`;
 }
 
+if(TEST) document.getElementById("testBanner").hidden=false;
 render();
-checkKey().then(()=>render());
 </script>
 </body>
 </html>
