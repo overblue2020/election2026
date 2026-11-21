@@ -172,3 +172,35 @@ function getSheet(test) {
 function reply(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }
+
+// 依陣營替候選人欄位上色（條件式格式，之後新增的資料也會自動套用）
+// 在 Apps Script 編輯器選這個函式按「執行」即可；重複執行會覆蓋為最新設定。
+const GREEN_CANDIDATES = ['沈伯洋', '蘇巧慧', '賴瑞隆', '童子瑋', '黃世杰', '莊競程', '鄭朝方', '陳品安', '何欣純',
+  '陳素月', '温世政', '林國漳', '劉建國', '王美惠', '蔡易餘', '陳亭妃', '周春米', '陳瑩', '吳淑瑾'];
+
+function colorCamps() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const green = { bg: '#c8e6c9', fg: '#1b5e20' };
+  const blue = { bg: '#cfe0fc', fg: '#0d3c8c' };
+  const pattern = '^(' + GREEN_CANDIDATES.join('|') + ')$';
+  [SHEET_NAME, TEST_SHEET_NAME].forEach(name => {
+    const sh = ss.getSheetByName(name);
+    if (!sh) return;
+    const rows = Math.max(sh.getMaxRows(), 1000);
+    // C 台北、E 新北、F 高雄、G–Y 其餘 19 縣市（D 是台北票差，不上色）
+    const cand = [sh.getRange(2, 3, rows - 1, 1), sh.getRange(2, 5, rows - 1, 21)];
+    const isGreen = 'REGEXMATCH(TO_TEXT(C2),"' + pattern + '")';
+    const rules = [
+      SpreadsheetApp.newConditionalFormatRule().whenFormulaSatisfied('=' + isGreen)
+        .setBackground(green.bg).setFontColor(green.fg).setRanges(cand).build(),
+      SpreadsheetApp.newConditionalFormatRule().whenFormulaSatisfied('=AND(C2<>"",NOT(' + isGreen + '))')
+        .setBackground(blue.bg).setFontColor(blue.fg).setRanges(cand).build(),
+      // 加分3：綠營席次、泛藍席次
+      SpreadsheetApp.newConditionalFormatRule().whenCellNotEmpty()
+        .setBackground(green.bg).setFontColor(green.fg).setRanges([sh.getRange(2, 28, rows - 1, 1)]).build(),
+      SpreadsheetApp.newConditionalFormatRule().whenCellNotEmpty()
+        .setBackground(blue.bg).setFontColor(blue.fg).setRanges([sh.getRange(2, 29, rows - 1, 1)]).build()
+    ];
+    sh.setConditionalFormatRules(rules);
+  });
+}
