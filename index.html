@@ -180,7 +180,7 @@ nav.cmd .wrap{display:flex;gap:10px;align-items:center}
 <script>
 // 貼上 Google Apps Script 部署後的網址
 const API_URL = "https://script.google.com/macros/s/AKfycbzXu_5Q1u5x9kIznNgfme77xBhtaeZFgsvr_Kc1Ly67kpDfig8tW1wJdeWsDVMv4FeY/exec";
-const DEADLINE = new Date("2026-11-20T23:59:00+08:00");
+const DEADLINE = new Date("2026-11-21T23:59:00+08:00");
 const B = c => c==="民進黨" ? "green" : "blue";
 
 const CORE = {
@@ -289,7 +289,7 @@ function render(){
   if(step===0){
     h=`<div class="hero"><div class="kicker">2026 九合一・縣市長</div><h1>決戰<br><span>2026</span></h1></div>
       <div class="stack">
-      <div class="panel stack"><label class="lbl">距離封關（11/20 23:59）</label><div class="countdown" id="cd"></div></div>
+      <div class="panel stack"><label class="lbl">距離封關（11/21 23:59）</label><div class="countdown" id="cd"></div></div>
       <div class="panel stack"><div><label class="lbl" for="nick">你的暱稱</label>
         <input type="text" id="nick" maxlength="20" placeholder="例如：竹北鐵口直斷" value="${esc(S.nickname)}"></div>
         <p class="warn" style="margin:0">每人只能下注一次，送出後不得修改。</p>

@@ -8,7 +8,7 @@
 const SPREADSHEET_ID = '1VvcyPCfXGYOOrgpLO6jR7gXryaDYoL3lkKvBbndQ4lc';
 const SHEET_NAME = '預測名單';
 const TEST_SHEET_NAME = '測試名單'; // test.html 送出的資料寫這裡，不計入正式比賽
-const DEADLINE = new Date('2026-11-20T23:59:00+08:00');
+const DEADLINE = new Date('2026-11-21T23:59:00+08:00');
 const INVITE_SHEET = '邀請碼';
 // 邀請碼只填在 Apps Script 裡，不要提交到 GitHub。格式：['0001', 'XXXXXXXX'], ...
 // 首次執行時會建立「邀請碼」工作表；之後新增或停用邀請碼，直接改那張工作表即可。
